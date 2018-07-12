@@ -25,14 +25,10 @@ def get_intersect(s):
             b2: [x, y] another point on the second line
             """
             #s = np.vstack([a1,a2,b1,b2])        # s for stacked
-            print(s)
             #h = np.hstack((s, np.ones((4, 1)))) # h for homogeneous
             h =s 
-            print(h)
             l1 = np.cross(h[0], h[1])           # get first line
             l2 = np.cross(h[2], h[3])           # get second line
-            print(l1)
-            print(l2)
             x, y, z = np.cross(l1, l2)          # point of intersection
             if z == 0:                          # lines are parallel
                return (float('inf'), float('inf'))
@@ -127,7 +123,6 @@ class POSCAR:
                 vectors.append(vector)
             lines = np.array(vectors)
             vectors = np.dot(lines,pos.lattice_vectors)
-            print(get_intersect(vectors))
 
 
         finally:
@@ -139,5 +134,13 @@ class POSCAR:
 if __name__ == "__main__":
     pos = POSCAR("./POSCAR")
     real_pos=np.dot(pos.atoms, pos.lattice_vectors)
-    print(real_pos)
+    a= real_pos[1]-real_pos[2]
+    b=real_pos[10]-real_pos[20]
+    c= np.cross(a,b)
+    d = real_pos[11]-real_pos[22]
+    cos = np.dot(np.array([0,0,1]),c)/np.linalg.norm(c)
+    rotate = np.cross(np.array([0,0,1]), c)
+    print(cos)
+    print(rotate)
+    print(np.dot(c,d))
     pos.gen_cone("./points")
