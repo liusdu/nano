@@ -105,30 +105,66 @@ class POSCAR:
      self.atoms =[]
      self.scaling_factor, self.lattice_vectors, self.atom_type, self.atom_num, self.atoms = load_POSCAR(path)
      
-
-    def gen_cone(self, path):
+    def get_arrays(self, path) :
         vectors = []
         try:
             f = open(path,'r')
             lines = f.readlines()
-            if len(lines) != 4 :
-                print("cone parameter:"+path+" format error: too short")
-                return []
-
-            for i in range(0, 4):
+            for i in range(len(lines)):
                 vector = convert_string_to_vector(lines[i].replace('\n',''))
                 if vector == [] :
                     print("invalid cone parameter")
                     return [] 
                 vectors.append(vector)
             lines = np.array(vectors)
-            vectors = np.dot(lines,pos.lattice_vectors)
+            vectors = np.dot(lines, self.lattice_vectors)
+            return vectors
 
 
         finally:
             if f != '' :
                 f.close()
+
+    def gen_cone(self, origin_path, lines_path):
+        origin = self.get_arrays(origin_path)
+        lines = self.get_arrays(lines_path)
+        origin_p = (origin[0] + origin[1])/2
+        print(origin_p)
+        for i in range(len(lines)) :
+            lines[i] = lines[i] - origin_p
+            lines[i][2] = 0; 
+        line1 =  lines[1] - lines[0]
+        line2 =  lines[3] - lines[2]
+        cut_ang = np.arccos(np.dot(line1,line2)/(np.linalg.norm(line1)*np.linalg.norm(line2)))
+        real_pos=np.dot(pos.atoms, pos.lattice_vectors)
+
+        base_x = np.array([1,0,0])
+        for i in range(len(real_pos)):
+            real_pos[i] =  real_pos[i] - origin_p
+            real_pos[i][2] = 0;
+        for i in range(len(real_pos)):
+            theta = np.arccos(np.dot(real_pos[i],base_x)/np.linalg.norm(real_pos[i]))
+            beta =  theta * np.pi *2/(np.pi*2 - cut_ang)
+            x = np.linalg.norm(real_pos[i]) * (np.pi*2 - cut_ang)/(np.pi *2) * np.cos(beta)
+            y =  np.linalg.norm(real_pos[i]) * (np.pi*2 - cut_ang)/(np.pi *2)  *np.sin(beta)
+            if  real_pos[i][1] < 0 :
+                y = y * -1
+            z = np.linalg.norm(real_pos[i]) *np.sqrt( 1- np.square((np.pi*2 - cut_ang)/(np.pi *2))) 
+            real_pos[i][0] = x
+            real_pos[i][1] = y
+            real_pos[i][2] = z
+        real = (real_pos/30)
+        real1 = []
+        for i in range(len(real)):
+            equal= 0
+            for j in range(len(real1)):
+                if int(real[i][0]*100) == int(real1[j][0]*100) and int(real[i][1]*100) == int(real1[j][1]*100)  and int(real[i][2]*100) == int(real1[j][2]*100):
+                        equal = 1
+            if equal == 0 :
+                real1.append(real[i])
+                print("\t%0.2f\t%0.2f\t%0.2f"%(real[i][0] + 0.5, real[i][1] + 0.5,real[i][2]))
             
+
 
 
 if __name__ == "__main__":
@@ -140,7 +176,7 @@ if __name__ == "__main__":
     d = real_pos[11]-real_pos[22]
     cos = np.dot(np.array([0,0,1]),c)/np.linalg.norm(c)
     rotate = np.cross(np.array([0,0,1]), c)
-    print(cos)
-    print(rotate)
-    print(np.dot(c,d))
-    pos.gen_cone("./points")
+    #print(cos)
+    #print(rotate)
+    #print(np.dot(c,d))
+    pos.gen_cone("./origin", "lines")
