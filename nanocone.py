@@ -3,6 +3,7 @@
 
 
 import numpy as np
+import sys
 
 #Cubic BN
 #   3.57
@@ -24,15 +25,6 @@ def get_intersect(s):
             b1: [x, y] a point on the second line
             b2: [x, y] another point on the second line
             """
-            #s = np.vstack([a1,a2,b1,b2])        # s for stacked
-            #h = np.hstack((s, np.ones((4, 1)))) # h for homogeneous
-            h =s 
-            l1 = np.cross(h[0], h[1])           # get first line
-            l2 = np.cross(h[2], h[3])           # get second line
-            x, y, z = np.cross(l1, l2)          # point of intersection
-            if z == 0:                          # lines are parallel
-               return (float('inf'), float('inf'))
-            return x,y,z
 
 def convert_string_to_vector(string):
     eles = string.split()
@@ -105,7 +97,7 @@ class POSCAR:
      self.atoms =[]
      self.scaling_factor, self.lattice_vectors, self.atom_type, self.atom_num, self.atoms = load_POSCAR(path)
      
-    def get_arrays(self, path) :
+    def get_vectors(self, path) :
         vectors = []
         try:
             f = open(path,'r')
@@ -125,23 +117,37 @@ class POSCAR:
             if f != '' :
                 f.close()
 
+    # all atoms are on x-y plane
+    def extend_supercells(self, x, y):
+        if x % 2 != 1  or y % 2 != 1 :
+            print("invalid  factor ", x,y)
+            exit(1)
+        after = np.array([])
+        for i in range(len(self.atoms)):
+            self.atoms[i][2] = 0
+        for i in range(0, x):
+            for j in range(0, y):
+                c_x = i - x/2
+                c_y  = j - y/2
+                after = np.append(after, self.atoms + np.array([c_x,c_y,0]))
+                after = after.reshape(-1,3)
+        self.atoms = after
+
     def gen_cone(self, origin_path, lines_path):
-        origin = self.get_arrays(origin_path)
-        lines = self.get_arrays(lines_path)
+        origin = self.get_vectors(origin_path)
+        lines = self.get_vectors(lines_path)
         origin_p = (origin[0] + origin[1])/2
-        print(origin_p)
+        origin_p[2] = 0
         for i in range(len(lines)) :
             lines[i] = lines[i] - origin_p
             lines[i][2] = 0; 
         line1 =  lines[1] - lines[0]
         line2 =  lines[3] - lines[2]
+        self.extend_supercells(3,3)
         cut_ang = np.arccos(np.dot(line1,line2)/(np.linalg.norm(line1)*np.linalg.norm(line2)))
         real_pos=np.dot(pos.atoms, pos.lattice_vectors)
-
+        
         base_x = np.array([1,0,0])
-        for i in range(len(real_pos)):
-            real_pos[i] =  real_pos[i] - origin_p
-            real_pos[i][2] = 0;
         for i in range(len(real_pos)):
             theta = np.arccos(np.dot(real_pos[i],base_x)/np.linalg.norm(real_pos[i]))
             beta =  theta * np.pi *2/(np.pi*2 - cut_ang)
@@ -153,30 +159,28 @@ class POSCAR:
             real_pos[i][0] = x
             real_pos[i][1] = y
             real_pos[i][2] = z
-        real = (real_pos/30)
+        real = (real_pos/100)
         real1 = []
         for i in range(len(real)):
             equal= 0
             for j in range(len(real1)):
-                if int(real[i][0]*100) == int(real1[j][0]*100) and int(real[i][1]*100) == int(real1[j][1]*100)  and int(real[i][2]*100) == int(real1[j][2]*100):
+                if int(real[i][0]*10000) == int(real1[j][0]*10000) and int(real[i][1]*10000) == int(real1[j][1]*10000)  and int(real[i][2]*10000) == int(real1[j][2]*10000):
                         equal = 1
             if equal == 0 :
+                if real[i][2] > 1:
+                    continue
                 real1.append(real[i])
-                print("\t%0.2f\t%0.2f\t%0.2f"%(real[i][0] + 0.5, real[i][1] + 0.5,real[i][2]))
+                print("\t%0.4f\t%0.4f\t%0.4f"%(real[i][0] + 0.5, real[i][1] + 0.5,real[i][2]))
             
 
 
 
 if __name__ == "__main__":
-    pos = POSCAR("./POSCAR")
-    real_pos=np.dot(pos.atoms, pos.lattice_vectors)
-    a= real_pos[1]-real_pos[2]
-    b=real_pos[10]-real_pos[20]
-    c= np.cross(a,b)
-    d = real_pos[11]-real_pos[22]
-    cos = np.dot(np.array([0,0,1]),c)/np.linalg.norm(c)
-    rotate = np.cross(np.array([0,0,1]), c)
-    #print(cos)
-    #print(rotate)
-    #print(np.dot(c,d))
+    
+    if len(sys.argv) != 2 :
+        print("useage: nanocone.py POSCAR")
+
+    poscar_file = sys.argv[1]
+    pos = POSCAR(poscar_file)
+
     pos.gen_cone("./origin", "lines")
